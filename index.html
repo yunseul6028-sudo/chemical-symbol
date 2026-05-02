@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>한국어 → 화학식</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Pretendard', sans-serif;
+    background: #fafafa;
+    color: #1a1a1a;
+    display: flex;
+    flex-direction: column;
+    padding: 10px;
+    gap: 8px;
+    -webkit-app-region: drag;
+  }
+  input, .formula, .empty, .hint {
+    -webkit-app-region: no-drag;
+  }
+  input {
+    width: 100%;
+    padding: 8px 10px;
+    font-size: 13px;
+    border: 1px solid #d8d8d8;
+    border-radius: 7px;
+    background: white;
+    text-align: center;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  input:focus { border-color: #4a90e2; }
+  .result {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .formula {
+    font-size: 26px;
+    font-weight: 600;
+    color: #111;
+    letter-spacing: -0.3px;
+    line-height: 1.1;
+    cursor: pointer;
+    padding: 4px 10px;
+    border-radius: 7px;
+    transition: background 0.15s, transform 0.1s, color 0.15s;
+    user-select: none;
+    text-align: center;
+    word-break: break-all;
+  }
+  .formula:hover { background: #eee; }
+  .formula:active { transform: scale(0.96); }
+  .formula.copied { background: #d4edda; color: #155724; }
+  .label {
+    font-size: 10px;
+    color: #aaa;
+    transition: color 0.15s;
+  }
+  .label.copied { color: #28a745; }
+  .empty {
+    color: #ccc;
+    font-size: 11px;
+  }
+  .hint {
+    font-size: 9px;
+    color: #bbb;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+  <input id="input" type="text" placeholder="단어 입력" autocomplete="off" autofocus>
+  <div class="result" id="result">
+    <div class="empty">단어 입력</div>
+  </div>
+<script>
+  const dict = {
+    // 원소 (1-118)
+    '수소':'H','헬륨':'He','리튬':'Li','베릴륨':'Be','붕소':'B',
+    '탄소':'C','질소':'N','산소':'O','플루오린':'F','플루오르':'F','불소':'F',
+    '네온':'Ne','나트륨':'Na','소듐':'Na','마그네슘':'Mg','알루미늄':'Al',
+    '규소':'Si','실리콘':'Si','인':'P','황':'S','염소':'Cl','아르곤':'Ar',
+    '칼륨':'K','포타슘':'K','칼슘':'Ca','스칸듐':'Sc',
+    '타이타늄':'Ti','티타늄':'Ti','바나듐':'V','크로뮴':'Cr','크롬':'Cr',
+    '망가니즈':'Mn','망간':'Mn','철':'Fe','코발트':'Co','니켈':'Ni',
+    '구리':'Cu','아연':'Zn','갈륨':'Ga','저마늄':'Ge','게르마늄':'Ge',
+    '비소':'As','셀레늄':'Se','셀렌':'Se','브로민':'Br','브롬':'Br','크립톤':'Kr',
+    '루비듐':'Rb','스트론튬':'Sr','이트륨':'Y','지르코늄':'Zr',
+    '나이오븀':'Nb','니오븀':'Nb','몰리브데넘':'Mo','몰리브덴':'Mo',
+    '테크네튬':'Tc','루테늄':'Ru','로듐':'Rh','팔라듐':'Pd',
+    '은':'Ag','카드뮴':'Cd','인듐':'In','주석':'Sn',
+    '안티모니':'Sb','안티몬':'Sb','텔루륨':'Te','텔루르':'Te',
+    '아이오딘':'I','요오드':'I','제논':'Xe','크세논':'Xe',
+    '세슘':'Cs','바륨':'Ba','란타넘':'La','란탄':'La','세륨':'Ce',
+    '프라세오디뮴':'Pr','네오디뮴':'Nd','프로메튬':'Pm','사마륨':'Sm','유로퓸':'Eu',
+    '가돌리늄':'Gd','터븀':'Tb','테르븀':'Tb','디스프로슘':'Dy','홀뮴':'Ho',
+    '어븀':'Er','에르븀':'Er','툴륨':'Tm','이터븀':'Yb','이테르븀':'Yb','루테튬':'Lu',
+    '하프늄':'Hf','탄탈럼':'Ta','탄탈룸':'Ta','텅스텐':'W','레늄':'Re',
+    '오스뮴':'Os','이리듐':'Ir','백금':'Pt','금':'Au','수은':'Hg',
+    '탈륨':'Tl','납':'Pb','비스무트':'Bi','비스무스':'Bi',
+    '폴로늄':'Po','아스타틴':'At','라돈':'Rn',
+    '프랑슘':'Fr','라듐':'Ra','악티늄':'Ac','토륨':'Th','프로트악티늄':'Pa',
+    '우라늄':'U','넵투늄':'Np','플루토늄':'Pu','아메리슘':'Am','퀴륨':'Cm',
+    '버클륨':'Bk','캘리포늄':'Cf','아인슈타이늄':'Es','페르뮴':'Fm','멘델레븀':'Md',
+    '노벨륨':'No','로렌슘':'Lr','러더포듐':'Rf','더브늄':'Db','시보귬':'Sg',
+    '보륨':'Bh','하슘':'Hs','마이트너륨':'Mt','다름슈타튬':'Ds','뢴트게늄':'Rg',
+    '코페르니슘':'Cn','니호늄':'Nh','플레로븀':'Fl','모스코븀':'Mc',
+    '리버모륨':'Lv','테네신':'Ts','오가네손':'Og',
+
+    // 기본 분자
+    '물':'H₂O','수증기':'H₂O','얼음':'H₂O','중수':'D₂O',
+    '오존':'O₃','드라이아이스':'CO₂',
+    '암모니아':'NH₃','하이드라진':'N₂H₄',
+    '포스핀':'PH₃','인화수소':'PH₃','실란':'SiH₄',
+    '메테인':'CH₄','메탄':'CH₄','에테인':'C₂H₆','에탄':'C₂H₆',
+    '프로페인':'C₃H₈','프로판':'C₃H₈','뷰테인':'C₄H₁₀','부탄':'C₄H₁₀',
+    '펜테인':'C₅H₁₂','펜탄':'C₅H₁₂','헥세인':'C₆H₁₄','헥산':'C₆H₁₄',
+    '헵테인':'C₇H₁₆','헵탄':'C₇H₁₆','옥테인':'C₈H₁₈','옥탄':'C₈H₁₈',
+    '노네인':'C₉H₂₀','노난':'C₉H₂₀','데케인':'C₁₀H₂₂','데칸':'C₁₀H₂₂',
+    '에텐':'CH₂=CH₂','에틸렌':'CH₂=CH₂','프로펜':'CH₂=CHCH₃','프로필렌':'CH₂=CHCH₃',
+    '뷰텐':'CH₂=CHCH₂CH₃','부틸렌':'CH₂=CHCH₂CH₃','에타인':'CH≡CH','아세틸렌':'CH≡CH',
+
+    // 방향족 / 유기
+    '벤젠':'C₆H₆','톨루엔':'C₆H₅CH₃','자일렌':'C₆H₄(CH₃)₂',
+    '나프탈렌':'C₁₀H₈','스타이렌':'C₆H₅CH=CH₂',
+    '페놀':'C₆H₅OH','아닐린':'C₆H₅NH₂',
+    '메탄올':'CH₃OH','메틸알코올':'CH₃OH',
+    '에탄올':'C₂H₅OH','에틸알코올':'C₂H₅OH','주정':'C₂H₅OH',
+    '프로판올':'C₃H₇OH','뷰탄올':'C₄H₉OH','부탄올':'C₄H₉OH',
+    '아이소프로판올':'(CH₃)₂CHOH','이소프로판올':'(CH₃)₂CHOH',
+    '글리세롤':'CH₂(OH)CH(OH)CH₂OH','글리세린':'CH₂(OH)CH(OH)CH₂OH','에틸렌글리콜':'HOCH₂CH₂OH',
+    '폼알데하이드':'HCHO','포름알데히드':'HCHO','폼알데히드':'HCHO',
+    '아세트알데히드':'CH₃CHO','아세톤':'(CH₃)₂CO',
+    '다이메틸케톤':'(CH₃)₂CO','다이메틸에테르':'CH₃OCH₃',
+    '다이에틸에테르':'(C₂H₅)₂O','에테르':'(C₂H₅)₂O',
+    '클로로포름':'CHCl₃','삼염화메탄':'CHCl₃','사염화탄소':'CCl₄',
+
+    // 당류 / 천연물
+    '포도당':'C₆H₁₂O₆','글루코스':'C₆H₁₂O₆',
+    '과당':'C₆H₁₂O₆','프룩토스':'C₆H₁₂O₆','갈락토스':'C₆H₁₂O₆',
+    '설탕':'C₁₂H₂₂O₁₁','수크로스':'C₁₂H₂₂O₁₁','자당':'C₁₂H₂₂O₁₁',
+    '맥아당':'C₁₂H₂₂O₁₁','말토스':'C₁₂H₂₂O₁₁',
+    '젖당':'C₁₂H₂₂O₁₁','락토스':'C₁₂H₂₂O₁₁',
+    '녹말':'(C₆H₁₀O₅)ₙ','전분':'(C₆H₁₀O₅)ₙ',
+    '셀룰로스':'(C₆H₁₀O₅)ₙ','셀룰로오스':'(C₆H₁₀O₅)ₙ',
+    '요소':'CO(NH₂)₂','유레아':'CO(NH₂)₂',
+    '카페인':'C₈H₁₀N₄O₂','니코틴':'C₁₀H₁₄N₂',
+    '아스피린':'CH₃COOC₆H₄COOH','아세틸살리실산':'CH₃COOC₆H₄COOH',
+    '비타민C':'C₆H₈O₆','아스코르브산':'C₆H₈O₆',
+
+    // 산
+    '염산':'HCl','염화수소':'HCl',
+    '황산':'H₂SO₄','아황산':'H₂SO₃',
+    '질산':'HNO₃','아질산':'HNO₂',
+    '인산':'H₃PO₄','탄산':'H₂CO₃',
+    '플루오린화수소산':'HF','불산':'HF','불화수소':'HF',
+    '브로민화수소산':'HBr','브롬화수소산':'HBr','브로민화수소':'HBr','브롬화수소':'HBr',
+    '아이오딘화수소산':'HI','요오드화수소산':'HI',
+    '아이오딘화수소':'HI','요오드화수소':'HI',
+    '과염소산':'HClO₄','염소산':'HClO₃','아염소산':'HClO₂',
+    '차아염소산':'HClO','하이포아염소산':'HClO',
+    '시안화수소':'HCN','청산':'HCN','시안산':'HOCN',
+    '황화수소':'H₂S','규산':'H₂SiO₃','붕산':'H₃BO₃',
+    '크로뮴산':'H₂CrO₄','이크로뮴산':'H₂Cr₂O₇','중크로뮴산':'H₂Cr₂O₇',
+    '과망가니즈산':'HMnO₄','과망간산':'HMnO₄','과산화수소':'H₂O₂',
+    '폼산':'HCOOH','포름산':'HCOOH','개미산':'HCOOH','의산':'HCOOH',
+    '아세트산':'CH₃COOH','초산':'CH₃COOH','빙초산':'CH₃COOH',
+    '프로피온산':'C₂H₅COOH','뷰탄산':'C₃H₇COOH','뷰티르산':'C₃H₇COOH',
+    '젖산':'CH₃CH(OH)COOH','락트산':'CH₃CH(OH)COOH',
+    '구연산':'HOC(COOH)(CH₂COOH)₂','시트르산':'HOC(COOH)(CH₂COOH)₂',
+    '옥살산':'(COOH)₂','수산':'(COOH)₂',
+    '숙신산':'HOOC(CH₂)₂COOH','말레산':'HOOCCH=CHCOOH',
+    '주석산':'C₄H₆O₆','타르타르산':'C₄H₆O₆',
+    '살리실산':'HOC₆H₄COOH','벤조산':'C₆H₅COOH','안식향산':'C₆H₅COOH',
+    '스테아르산':'C₁₇H₃₅COOH','팔미트산':'C₁₅H₃₁COOH',
+    '올레산':'CH₃(CH₂)₇CH=CH(CH₂)₇COOH','리놀레산':'CH₃(CH₂)₄CH=CHCH₂CH=CH(CH₂)₇COOH','요산':'C₅H₄N₄O₃',
+
+    // 염기
+    '수산화나트륨':'NaOH','가성소다':'NaOH','양잿물':'NaOH',
+    '수산화칼륨':'KOH','가성칼리':'KOH',
+    '수산화칼슘':'Ca(OH)₂','소석회':'Ca(OH)₂','석회수':'Ca(OH)₂',
+    '수산화마그네슘':'Mg(OH)₂','수산화알루미늄':'Al(OH)₃',
+    '수산화암모늄':'NH₄OH','수산화바륨':'Ba(OH)₂',
+    '수산화리튬':'LiOH','수산화철':'Fe(OH)₃',
+    '수산화구리':'Cu(OH)₂','수산화아연':'Zn(OH)₂',
+    '수산화코발트':'Co(OH)₂','수산화니켈':'Ni(OH)₂',
+
+    // 산화물
+    '일산화탄소':'CO','이산화탄소':'CO₂',
+    '일산화질소':'NO','이산화질소':'NO₂',
+    '아산화질소':'N₂O','일산화이질소':'N₂O',
+    '삼산화이질소':'N₂O₃','사산화이질소':'N₂O₄','오산화이질소':'N₂O₅',
+    '이산화황':'SO₂','삼산화황':'SO₃',
+    '이산화규소':'SiO₂','이산화염소':'ClO₂',
+    '이산화망가니즈':'MnO₂','이산화망간':'MnO₂',
+    '이산화티타늄':'TiO₂','이산화타이타늄':'TiO₂',
+    '이산화납':'PbO₂','이산화우라늄':'UO₂',
+    '오산화이인':'P₂O₅','삼산화이인':'P₂O₃',
+    '삼산화이비소':'As₂O₃','오산화이비소':'As₂O₅',
+    '산화나트륨':'Na₂O','산화칼륨':'K₂O',
+    '산화칼슘':'CaO','생석회':'CaO',
+    '산화마그네슘':'MgO','산화알루미늄':'Al₂O₃','알루미나':'Al₂O₃',
+    '산화철':'Fe₂O₃','산화제일철':'FeO','산화제이철':'Fe₂O₃',
+    '사산화삼철':'Fe₃O₄','자철석':'Fe₃O₄','적철석':'Fe₂O₃',
+    '산화구리':'CuO','산화제일구리':'Cu₂O','산화제이구리':'CuO',
+    '산화아연':'ZnO','산화수은':'HgO','산화은':'Ag₂O',
+    '산화바륨':'BaO','산화리튬':'Li₂O','산화스트론튬':'SrO',
+    '산화코발트':'CoO','산화니켈':'NiO',
+    '산화크로뮴':'Cr₂O₃','산화바나듐':'V₂O₅','산화주석':'SnO₂',
+
+    // 염화물
+    '염화나트륨':'NaCl','소금':'NaCl','식염':'NaCl',
+    '염화칼륨':'KCl','염화칼슘':'CaCl₂',
+    '염화마그네슘':'MgCl₂','염화암모늄':'NH₄Cl',
+    '염화은':'AgCl','염화구리':'CuCl₂',
+    '염화제일구리':'CuCl','염화제이구리':'CuCl₂',
+    '염화철':'FeCl₃','염화제일철':'FeCl₂','염화제이철':'FeCl₃',
+    '염화수은':'HgCl₂','염화알루미늄':'AlCl₃',
+    '염화바륨':'BaCl₂','염화아연':'ZnCl₂',
+    '염화리튬':'LiCl','염화코발트':'CoCl₂','염화니켈':'NiCl₂',
+    '염화주석':'SnCl₂','염화납':'PbCl₂','염화백금':'PtCl₂',
+
+    // 탄산염
+    '탄산나트륨':'Na₂CO₃','탄산소다':'Na₂CO₃','소다회':'Na₂CO₃',
+    '탄산칼슘':'CaCO₃','석회석':'CaCO₃','대리석':'CaCO₃','방해석':'CaCO₃',
+    '탄산수소나트륨':'NaHCO₃','중탄산나트륨':'NaHCO₃',
+    '베이킹소다':'NaHCO₃','중조':'NaHCO₃',
+    '탄산수소칼륨':'KHCO₃','탄산칼륨':'K₂CO₃',
+    '탄산마그네슘':'MgCO₃','탄산암모늄':'(NH₄)₂CO₃',
+    '탄산리튬':'Li₂CO₃','탄산바륨':'BaCO₃','탄산스트론튬':'SrCO₃',
+
+    // 황산염
+    '황산나트륨':'Na₂SO₄','황산칼륨':'K₂SO₄',
+    '황산칼슘':'CaSO₄','석고':'CaSO₄·2H₂O',
+    '황산마그네슘':'MgSO₄','황산구리':'CuSO₄',
+    '황산철':'FeSO₄','황산아연':'ZnSO₄',
+    '황산암모늄':'(NH₄)₂SO₄','황산알루미늄':'Al₂(SO₄)₃',
+    '황산바륨':'BaSO₄','황산수소나트륨':'NaHSO₄',
+    '황산리튬':'Li₂SO₄','황산은':'Ag₂SO₄',
+    '황산니켈':'NiSO₄','황산코발트':'CoSO₄','황산수은':'HgSO₄',
+    '명반':'KAl(SO₄)₂·12H₂O',
+
+    // 질산염
+    '질산나트륨':'NaNO₃','칠레초석':'NaNO₃',
+    '질산칼륨':'KNO₃','초석':'KNO₃',
+    '질산암모늄':'NH₄NO₃','질산은':'AgNO₃',
+    '질산칼슘':'Ca(NO₃)₂','질산구리':'Cu(NO₃)₂',
+    '질산아연':'Zn(NO₃)₂','질산납':'Pb(NO₃)₂',
+    '질산알루미늄':'Al(NO₃)₃','질산바륨':'Ba(NO₃)₂',
+    '질산마그네슘':'Mg(NO₃)₂','질산리튬':'LiNO₃',
+
+    // 인산염
+    '인산나트륨':'Na₃PO₄','인산칼슘':'Ca₃(PO₄)₂',
+    '인산수소나트륨':'Na₂HPO₄','인산이수소나트륨':'NaH₂PO₄',
+    '인산칼륨':'K₃PO₄','인산암모늄':'(NH₄)₃PO₄',
+
+    // 황화물
+    '황화나트륨':'Na₂S','황화철':'FeS',
+    '황화구리':'CuS','황화아연':'ZnS','황화납':'PbS',
+    '황화수은':'HgS','황화은':'Ag₂S',
+    '황화칼륨':'K₂S','황화칼슘':'CaS',
+    '황화암모늄':'(NH₄)₂S','이황화탄소':'CS₂',
+
+    // 브로민/아이오딘/플루오린화물
+    '브로민화나트륨':'NaBr','브롬화나트륨':'NaBr',
+    '브로민화칼륨':'KBr','브롬화칼륨':'KBr',
+    '브로민화은':'AgBr','브롬화은':'AgBr',
+    '브로민화칼슘':'CaBr₂','브롬화칼슘':'CaBr₂',
+    '아이오딘화칼륨':'KI','요오드화칼륨':'KI',
+    '아이오딘화나트륨':'NaI','요오드화나트륨':'NaI',
+    '아이오딘화은':'AgI','요오드화은':'AgI',
+    '플루오린화나트륨':'NaF','불화나트륨':'NaF',
+    '플루오린화칼륨':'KF','불화칼륨':'KF',
+    '플루오린화칼슘':'CaF₂','불화칼슘':'CaF₂','형석':'CaF₂',
+
+    // 질화물 / 탄화물 / 인화물
+    '질화나트륨':'Na₃N','질화알루미늄':'AlN','질화규소':'Si₃N₄',
+    '탄화규소':'SiC','카보런덤':'SiC',
+    '탄화칼슘':'CaC₂','카바이드':'CaC₂','인화칼슘':'Ca₃P₂',
+
+    // 아세트산염 / 시안화물
+    '아세트산나트륨':'CH₃COONa','초산나트륨':'CH₃COONa',
+    '아세트산칼륨':'CH₃COOK',
+    '아세트산납':'(CH₃COO)₂Pb','아세트산구리':'(CH₃COO)₂Cu',
+    '시안화나트륨':'NaCN','사이안화나트륨':'NaCN',
+    '시안화칼륨':'KCN','사이안화칼륨':'KCN','청화칼륨':'KCN',
+
+    // 과망가니즈산 / 크로뮴산염
+    '과망가니즈산칼륨':'KMnO₄','과망간산칼륨':'KMnO₄',
+    '크로뮴산칼륨':'K₂CrO₄','크롬산칼륨':'K₂CrO₄',
+    '이크로뮴산칼륨':'K₂Cr₂O₇','중크로뮴산칼륨':'K₂Cr₂O₇',
+
+    // 차아염소산 / 티오황산염
+    '차아염소산나트륨':'NaClO','하이포아염소산나트륨':'NaClO',
+    '티오황산나트륨':'Na₂S₂O₃','하이포':'Na₂S₂O₃',
+
+    // 이온
+    '수산화이온':'OH⁻','수산이온':'OH⁻',
+    '암모늄이온':'NH₄⁺','하이드로늄이온':'H₃O⁺','옥소늄이온':'H₃O⁺',
+    '수소이온':'H⁺',
+    '탄산이온':'CO₃²⁻','탄산수소이온':'HCO₃⁻','중탄산이온':'HCO₃⁻',
+    '황산이온':'SO₄²⁻','황산수소이온':'HSO₄⁻',
+    '질산이온':'NO₃⁻','인산이온':'PO₄³⁻','시안화이온':'CN⁻',
+    '과망가니즈산이온':'MnO₄⁻','과망간산이온':'MnO₄⁻',
+    '크로뮴산이온':'CrO₄²⁻','이크로뮴산이온':'Cr₂O₇²⁻',
+    '염화이온':'Cl⁻','브로민화이온':'Br⁻','브롬화이온':'Br⁻',
+    '아이오딘화이온':'I⁻','요오드화이온':'I⁻',
+    '플루오린화이온':'F⁻','불화이온':'F⁻',
+    '산화이온':'O²⁻','황화이온':'S²⁻','질화이온':'N³⁻',
+    '나트륨이온':'Na⁺','칼륨이온':'K⁺','칼슘이온':'Ca²⁺',
+    '마그네슘이온':'Mg²⁺','알루미늄이온':'Al³⁺',
+    '철이온':'Fe³⁺','구리이온':'Cu²⁺','아연이온':'Zn²⁺',
+    '은이온':'Ag⁺','납이온':'Pb²⁺','바륨이온':'Ba²⁺',
+
+    // ===== TCA 회로 / 대사 =====
+    '옥살로아세트산':'HOOCCOCH₂COOH','옥살아세트산':'HOOCCOCH₂COOH',
+    '피루브산':'CH₃COCOOH','파이루브산':'CH₃COCOOH',
+    '말산':'HOOCCH(OH)CH₂COOH','말레산':'HOOCCH=CHCOOH',
+    '푸마르산':'HOOCCH=CHCOOH','퓨마르산':'HOOCCH=CHCOOH',
+    '이소시트르산':'HOOCCH(OH)CH(COOH)CH₂COOH','아이소시트르산':'HOOCCH(OH)CH(COOH)CH₂COOH',
+    '알파케토글루타르산':'HOOC(CH₂)₂COCOOH','케토글루타르산':'HOOC(CH₂)₂COCOOH',
+    '아세틸코에이':'C₂₃H₃₈N₇O₁₇P₃S','아세틸코엔자임에이':'C₂₃H₃₈N₇O₁₇P₃S',
+    '코엔자임에이':'C₂₁H₃₆N₇O₁₆P₃S','코에이':'C₂₁H₃₆N₇O₁₆P₃S',
+    '말론산':'HOOCCH₂COOH','글루타르산':'HOOC(CH₂)₃COOH','아디프산':'HOOC(CH₂)₄COOH',
+
+    // ===== 아미노산 (20종) =====
+    '글리신':'NH₂CH₂COOH','알라닌':'CH₃CH(NH₂)COOH',
+    '발린':'(CH₃)₂CHCH(NH₂)COOH','류신':'(CH₃)₂CHCH₂CH(NH₂)COOH',
+    '이소류신':'CH₃CH₂CH(CH₃)CH(NH₂)COOH','아이소류신':'CH₃CH₂CH(CH₃)CH(NH₂)COOH',
+    '프롤린':'C₅H₉NO₂','페닐알라닌':'C₆H₅CH₂CH(NH₂)COOH',
+    '트립토판':'C₁₁H₁₂N₂O₂','메티오닌':'CH₃S(CH₂)₂CH(NH₂)COOH',
+    '세린':'HOCH₂CH(NH₂)COOH','트레오닌':'CH₃CH(OH)CH(NH₂)COOH',
+    '시스테인':'HSCH₂CH(NH₂)COOH','티로신':'HOC₆H₄CH₂CH(NH₂)COOH',
+    '아스파라긴':'H₂NCOCH₂CH(NH₂)COOH','글루타민':'H₂NCO(CH₂)₂CH(NH₂)COOH',
+    '아스파르트산':'HOOCCH₂CH(NH₂)COOH','아스파라긴산':'HOOCCH₂CH(NH₂)COOH',
+    '글루탐산':'HOOC(CH₂)₂CH(NH₂)COOH','글루타민산':'HOOC(CH₂)₂CH(NH₂)COOH',
+    '라이신':'H₂N(CH₂)₄CH(NH₂)COOH','리신':'H₂N(CH₂)₄CH(NH₂)COOH','리이신':'H₂N(CH₂)₄CH(NH₂)COOH',
+    '아르기닌':'H₂NC(=NH)NH(CH₂)₃CH(NH₂)COOH','히스티딘':'C₆H₉N₃O₂',
+    '글루타티온':'C₁₀H₁₇N₃O₆S',
+
+    // ===== 핵염기 / 뉴클레오사이드 / 뉴클레오타이드 =====
+    '아데닌':'C₅H₅N₅','구아닌':'C₅H₅N₅O',
+    '시토신':'C₄H₅N₃O','사이토신':'C₄H₅N₃O',
+    '티민':'C₅H₆N₂O₂','타이민':'C₅H₆N₂O₂',
+    '우라실':'C₄H₄N₂O₂',
+    '아데노신':'C₁₀H₁₃N₅O₄','구아노신':'C₁₀H₁₃N₅O₅',
+    '시티딘':'C₉H₁₃N₃O₅','티미딘':'C₁₀H₁₄N₂O₅','우리딘':'C₉H₁₂N₂O₆',
+    '에이티피':'C₁₀H₁₆N₅O₁₃P₃','아데노신삼인산':'C₁₀H₁₆N₅O₁₃P₃',
+    '에이디피':'C₁₀H₁₅N₅O₁₀P₂','아데노신이인산':'C₁₀H₁₅N₅O₁₀P₂',
+    '에이엠피':'C₁₀H₁₄N₅O₇P','아데노신일인산':'C₁₀H₁₄N₅O₇P',
+    '지티피':'C₁₀H₁₆N₅O₁₄P₃','구아노신삼인산':'C₁₀H₁₆N₅O₁₄P₃',
+    '시에이엠피':'C₁₀H₁₂N₅O₆P','고리형아데노신일인산':'C₁₀H₁₂N₅O₆P',
+    '엔에이디':'C₂₁H₂₇N₇O₁₄P₂','니코틴아마이드아데닌다이뉴클레오타이드':'C₂₁H₂₇N₇O₁₄P₂',
+    '엔에이디에이치':'C₂₁H₂₉N₇O₁₄P₂',
+    '엔에이디피':'C₂₁H₂₈N₇O₁₇P₃','엔에이디피에이치':'C₂₁H₃₀N₇O₁₇P₃',
+    '에프에이디':'C₂₇H₃₃N₉O₁₅P₂','플라빈아데닌다이뉴클레오타이드':'C₂₇H₃₃N₉O₁₅P₂',
+    '에프에이디에이치투':'C₂₇H₃₅N₉O₁₅P₂',
+
+    // ===== 당류 (추가) =====
+    '리보스':'C₅H₁₀O₅','리보오스':'C₅H₁₀O₅',
+    '데옥시리보스':'C₅H₁₀O₄','디옥시리보스':'C₅H₁₀O₄',
+    '만노스':'C₆H₁₂O₆','자일로스':'C₅H₁₀O₅',
+    '아라비노스':'C₅H₁₀O₅','람노스':'C₆H₁₂O₅',
+
+    // ===== 호르몬 / 신경전달물질 =====
+    '도파민':'C₈H₁₁NO₂','세로토닌':'C₁₀H₁₂N₂O',
+    '멜라토닌':'C₁₃H₁₆N₂O₂',
+    '아드레날린':'C₉H₁₃NO₃','에피네프린':'C₉H₁₃NO₃',
+    '노르아드레날린':'C₈H₁₁NO₃','노르에피네프린':'C₈H₁₁NO₃',
+    '아세틸콜린':'C₇H₁₆NO₂⁺',
+    '가바':'C₄H₉NO₂','감마아미노부티르산':'C₄H₉NO₂',
+    '히스타민':'C₅H₉N₃',
+    '코르티솔':'C₂₁H₃₀O₅','코르티손':'C₂₁H₂₈O₅',
+    '테스토스테론':'C₁₉H₂₈O₂','에스트라디올':'C₁₈H₂₄O₂',
+    '프로게스테론':'C₂₁H₃₀O₂',
+    '옥시토신':'C₄₃H₆₆N₁₂O₁₂S₂',
+    '티록신':'C₁₅H₁₁I₄NO₄',
+    '갑상선호르몬':'C₁₅H₁₁I₄NO₄',
+
+    // ===== 비타민 =====
+    '비타민에이':'C₂₀H₃₀O','레티놀':'C₂₀H₃₀O',
+    '비타민비원':'C₁₂H₁₇N₄OS⁺','티아민':'C₁₂H₁₇N₄OS⁺',
+    '비타민비투':'C₁₇H₂₀N₄O₆','리보플라빈':'C₁₇H₂₀N₄O₆',
+    '비타민비쓰리':'C₆H₅NO₂','니아신':'C₆H₅NO₂','나이아신':'C₆H₅NO₂',
+    '비타민비파이브':'C₉H₁₇NO₅','판토텐산':'C₉H₁₇NO₅',
+    '비타민비식스':'C₈H₁₁NO₃','피리독신':'C₈H₁₁NO₃',
+    '비타민비세븐':'C₁₀H₁₆N₂O₃S','비오틴':'C₁₀H₁₆N₂O₃S',
+    '비타민비나인':'C₁₉H₁₉N₇O₆','엽산':'C₁₉H₁₉N₇O₆','폴산':'C₁₉H₁₉N₇O₆',
+    '비타민비투엘브':'C₆₃H₈₈CoN₁₄O₁₄P','코발라민':'C₆₃H₈₈CoN₁₄O₁₄P',
+    '비타민디':'C₂₇H₄₄O','콜레칼시페롤':'C₂₇H₄₄O',
+    '비타민이':'C₂₉H₅₀O₂','토코페롤':'C₂₉H₅₀O₂',
+    '비타민케이':'C₃₁H₄₆O₂','필로퀴논':'C₃₁H₄₆O₂',
+
+    // ===== 지질 =====
+    '콜레스테롤':'C₂₇H₄₆O',
+    '리놀렌산':'C₁₈H₃₀O₂','아라키돈산':'C₂₀H₃₂O₂',
+    '디에이치에이':'C₂₂H₃₂O₂','이피에이':'C₂₀H₃₀O₂',
+    '카프르산':'CH₃(CH₂)₈COOH','라우르산':'CH₃(CH₂)₁₀COOH','미리스트산':'CH₃(CH₂)₁₂COOH',
+    '베타카로틴':'C₄₀H₅₆','카로틴':'C₄₀H₅₆',
+    '레시틴':'C₄₂H₈₂NO₈P',
+
+    // ===== 의약품 =====
+    '아세트아미노펜':'C₈H₉NO₂','파라세타몰':'C₈H₉NO₂','타이레놀':'C₈H₉NO₂',
+    '이부프로펜':'C₁₃H₁₈O₂',
+    '나프록센':'C₁₄H₁₄O₃',
+    '페니실린':'C₁₆H₁₈N₂O₄S',
+    '아목시실린':'C₁₆H₁₉N₃O₅S',
+    '모르핀':'C₁₇H₁₉NO₃',
+    '헤로인':'C₂₁H₂₃NO₅',
+    '코카인':'C₁₇H₂₁NO₄',
+    '디아제팜':'C₁₆H₁₃ClN₂O','발륨':'C₁₆H₁₃ClN₂O',
+    '카페인':'C₈H₁₀N₄O₂','니코틴':'C₁₀H₁₄N₂',
+    '테트라하이드로칸나비놀':'C₂₁H₃₀O₂','티에이치씨':'C₂₁H₃₀O₂',
+    '엘에스디':'C₂₀H₂₅N₃O',
+    '메스암페타민':'C₁₀H₁₅N','암페타민':'C₉H₁₃N',
+    '비아그라':'C₂₂H₃₀N₆O₄S','실데나필':'C₂₂H₃₀N₆O₄S',
+
+    // ===== 식품 첨가물 / 기타 =====
+    '사카린':'C₇H₅NO₃S','아스파탐':'C₁₄H₁₈N₂O₅',
+    '엠에스지':'C₅H₈NNaO₄','글루탐산나트륨':'C₅H₈NNaO₄',
+    '바닐린':'C₈H₈O₃','계피알데히드':'C₉H₈O',
+    '카르노식산':'C₂₀H₂₈O₄',
+    '시안화이온':'CN⁻',
+
+    // ===== 폭발물 / 산업 =====
+    '디디티':'C₁₄H₉Cl₅',
+    '티엔티':'C₇H₅N₃O₆','트라이나이트로톨루엔':'C₇H₅N₃O₆',
+    '나이트로글리세린':'C₃H₅N₃O₉','니트로글리세린':'C₃H₅N₃O₉',
+    '알엠엑스':'C₄H₈N₈O₈','아르디엑스':'C₄H₈N₈O₈',
+    '시포':'C₃H₆N₆O₆','씨포':'C₃H₆N₆O₆',
+    '인디고':'C₁₆H₁₀N₂O₂',
+    '클로로필':'C₅₅H₇₂MgN₄O₅','엽록소':'C₅₅H₇₂MgN₄O₅',
+    '헴':'C₃₄H₃₂FeN₄O₄','헤모글로빈헴':'C₃₄H₃₂FeN₄O₄',
+
+    // ===== 고분자 =====
+    '폴리에틸렌':'(C₂H₄)ₙ','피이':'(C₂H₄)ₙ',
+    '폴리프로필렌':'(C₃H₆)ₙ','피피':'(C₃H₆)ₙ',
+    '폴리염화비닐':'(C₂H₃Cl)ₙ','피브이씨':'(C₂H₃Cl)ₙ',
+    '폴리스타이렌':'(C₈H₈)ₙ','피에스':'(C₈H₈)ₙ',
+    '나일론':'(C₆H₁₁NO)ₙ','나일론육':'(C₆H₁₁NO)ₙ',
+    '페트':'(C₁₀H₈O₄)ₙ','피이티':'(C₁₀H₈O₄)ₙ',
+    '테플론':'(C₂F₄)ₙ','폴리테트라플루오로에틸렌':'(C₂F₄)ₙ',
+    '폴리카보네이트':'(C₁₆H₁₄O₃)ₙ',
+
+    // ===== 추가 무기 / 광물 =====
+    '석영':'SiO₂','수정':'SiO₂',
+    '활석':'Mg₃Si₄O₁₀(OH)₂','탤크':'Mg₃Si₄O₁₀(OH)₂',
+    '운모':'KAl₂(AlSi₃O₁₀)(OH)₂',
+    '암염':'NaCl','빙정석':'Na₃AlF₆',
+    '황철석':'FeS₂','황동석':'CuFeS₂',
+    '방연석':'PbS','섬아연석':'ZnS',
+    '보크사이트':'Al(OH)₃',
+    '석면':'Mg₃Si₂O₅(OH)₄'
+  };
+
+  // ===== 명명법 파서 =====
+  // 원소 이름 → 기호 (모든 표기 변형 포함)
+  const elements = {
+    '수소':'H','헬륨':'He','리튬':'Li','베릴륨':'Be','붕소':'B',
+    '탄소':'C','질소':'N','산소':'O','플루오린':'F','플루오르':'F','불소':'F',
+    '네온':'Ne','나트륨':'Na','소듐':'Na','마그네슘':'Mg','알루미늄':'Al',
+    '규소':'Si','실리콘':'Si','인':'P','황':'S','염소':'Cl','아르곤':'Ar',
+    '칼륨':'K','포타슘':'K','칼슘':'Ca','스칸듐':'Sc',
+    '타이타늄':'Ti','티타늄':'Ti','바나듐':'V','크로뮴':'Cr','크롬':'Cr',
+    '망가니즈':'Mn','망간':'Mn','철':'Fe','코발트':'Co','니켈':'Ni',
+    '구리':'Cu','아연':'Zn','갈륨':'Ga','저마늄':'Ge','게르마늄':'Ge',
+    '비소':'As','셀레늄':'Se','셀렌':'Se','브로민':'Br','브롬':'Br','크립톤':'Kr',
+    '루비듐':'Rb','스트론튬':'Sr','이트륨':'Y','지르코늄':'Zr',
+    '나이오븀':'Nb','니오븀':'Nb','몰리브데넘':'Mo','몰리브덴':'Mo',
+    '테크네튬':'Tc','루테늄':'Ru','로듐':'Rh','팔라듐':'Pd',
+    '은':'Ag','카드뮴':'Cd','인듐':'In','주석':'Sn',
+    '안티모니':'Sb','안티몬':'Sb','텔루륨':'Te','텔루르':'Te',
+    '아이오딘':'I','요오드':'I','제논':'Xe','크세논':'Xe',
+    '세슘':'Cs','바륨':'Ba','란타넘':'La','란탄':'La','세륨':'Ce',
+    '프라세오디뮴':'Pr','네오디뮴':'Nd','프로메튬':'Pm','사마륨':'Sm','유로퓸':'Eu',
+    '가돌리늄':'Gd','터븀':'Tb','테르븀':'Tb','디스프로슘':'Dy','홀뮴':'Ho',
+    '어븀':'Er','에르븀':'Er','툴륨':'Tm','이터븀':'Yb','이테르븀':'Yb','루테튬':'Lu',
+    '하프늄':'Hf','탄탈럼':'Ta','탄탈룸':'Ta','텅스텐':'W','레늄':'Re',
+    '오스뮴':'Os','이리듐':'Ir','백금':'Pt','금':'Au','수은':'Hg',
+    '탈륨':'Tl','납':'Pb','비스무트':'Bi','비스무스':'Bi',
+    '폴로늄':'Po','아스타틴':'At','라돈':'Rn',
+    '프랑슘':'Fr','라듐':'Ra','악티늄':'Ac','토륨':'Th','우라늄':'U'
+  };
+
+  // 수사 접두어
+  const numPrefix = {
+    '일':1,'이':2,'삼':3,'사':4,'오':5,'육':6,'칠':7,'팔':8,'구':9,'십':10,
+    '모노':1,'다이':2,'디':2,'트라이':3,'트리':3,'테트라':4,'펜타':5,
+    '헥사':6,'헵타':7,'옥타':8,'노나':9,'데카':10
+  };
+
+  // 음이온 형태 (이성분 화합물)
+  const anionForms = {
+    '산화':'O','황화':'S','염화':'Cl','질화':'N',
+    '불화':'F','플루오린화':'F','플루오르화':'F',
+    '브롬화':'Br','브로민화':'Br','요오드화':'I','아이오딘화':'I',
+    '인화':'P','탄화':'C','수소화':'H',
+    '셀렌화':'Se','셀레늄화':'Se','텔루륨화':'Te'
+  };
+
+  const subDigits = '₀₁₂₃₄₅₆₇₈₉';
+  function subscript(n) {
+    if (n === 1) return '';
+    return String(n).split('').map(d => subDigits[+d]).join('');
+  }
+
+  // 이성분 명명법: [수사][음이온]화 [수사][원소]
+  // 예: 일산화이수소 → H₂O, 오산화이인 → P₂O₅, 사염화탄소 → CCl₄
+  function tryBinary(name) {
+    const elemNames = Object.keys(elements).sort((a,b) => b.length - a.length);
+    const anions = Object.keys(anionForms).sort((a,b) => b.length - a.length);
+
+    for (const anion of anions) {
+      const idx = name.indexOf(anion);
+      if (idx === -1) continue;
+      const before = name.substring(0, idx);
+      const after = name.substring(idx + anion.length);
+      if (!after) continue;
+
+      // 음이온 쪽은 명시적 접두어 필요 (이온결합 화합물과 충돌 방지)
+      if (!numPrefix[before]) continue;
+      const p1 = numPrefix[before];
+
+      for (const elem of elemNames) {
+        if (!after.endsWith(elem)) continue;
+        const prefStr = after.substring(0, after.length - elem.length);
+        let p2;
+        if (prefStr === '') p2 = 1;
+        else if (numPrefix[prefStr]) p2 = numPrefix[prefStr];
+        else continue;
+
+        const cation = elements[elem];
+        const anionSym = anionForms[anion];
+        return `${cation}${subscript(p2)}${anionSym}${subscript(p1)}`;
+      }
+    }
+    return null;
+  }
+
+  // [수사][원소] (예: 이수소 → H₂, 삼산소 → O₃)
+  function tryPrefixed(name) {
+    const elemNames = Object.keys(elements).sort((a,b) => b.length - a.length);
+    for (const elem of elemNames) {
+      if (!name.endsWith(elem)) continue;
+      const prefStr = name.substring(0, name.length - elem.length);
+      if (!prefStr || !numPrefix[prefStr]) continue;
+      return `${elements[elem]}${subscript(numPrefix[prefStr])}`;
+    }
+    return null;
+  }
+
+  // ===== 음성 파서 (에이치투오 → H₂O) =====
+  const letterPhones = {
+    '에이치':'H','더블유':'W','아르':'R',
+    '에이':'A','에프':'F','에스':'S','아이':'I',
+    '제이':'J','케이':'K','브이':'V','엑스':'X','와이':'Y','제트':'Z',
+    '비':'B','씨':'C','디':'D','지':'G',
+    '엘':'L','엠':'M','엔':'N','피':'P','큐':'Q',
+    '알':'R','티':'T','유':'U',
+    '이':'E','오':'O'
+  };
+  const digitPhones = {
+    '쓰리':3,'식스':6,'세븐':7,'에잇':8,'나인':9,'파이브':5,
+    '원':1,'투':2,'포':4,'텐':10,
+    '일':1,'이':2,'삼':3,'사':4,'오':5,
+    '육':6,'칠':7,'팔':8,'구':9,'십':10
+  };
+
+  // 원소 기호 (대문자 매핑) — 음성 결과 파티션용
+  const elemSyms = ['H','He','Li','Be','B','C','N','O','F','Ne','Na','Mg','Al','Si','P','S','Cl','Ar','K','Ca','Sc','Ti','V','Cr','Mn','Fe','Co','Ni','Cu','Zn','Ga','Ge','As','Se','Br','Kr','Rb','Sr','Y','Zr','Nb','Mo','Tc','Ru','Rh','Pd','Ag','Cd','In','Sn','Sb','Te','I','Xe','Cs','Ba','La','Ce','Pr','Nd','Pm','Sm','Eu','Gd','Tb','Dy','Ho','Er','Tm','Yb','Lu','Hf','Ta','W','Re','Os','Ir','Pt','Au','Hg','Tl','Pb','Bi','Po','At','Rn','Fr','Ra','Ac','Th','Pa','U','Np','Pu','Am','Cm','Bk','Cf','Es','Fm','Md','No','Lr','Rf','Db','Sg','Bh','Hs','Mt','Ds','Rg','Cn','Nh','Fl','Mc','Lv','Ts','Og'];
+  const elemUpperToProper = Object.fromEntries(elemSyms.map(s => [s.toUpperCase(), s]));
+
+  function partitionLetters(letters) {
+    if (!letters) return '';
+    // 단일문자 우선 (화학식에서 각 원소는 대문자로 시작하므로 CO=C+O가 자연스러움)
+    if (elemUpperToProper[letters[0]]) {
+      const rest = partitionLetters(letters.substring(1));
+      if (rest !== null) return elemUpperToProper[letters[0]] + rest;
+    }
+    // 단일문자가 원소가 아니거나 뒤가 막히면 2문자 시도 (Na, Cl, Br 등)
+    if (letters.length >= 2 && elemUpperToProper[letters.substring(0, 2)]) {
+      const rest = partitionLetters(letters.substring(2));
+      if (rest !== null) return elemUpperToProper[letters.substring(0, 2)] + rest;
+    }
+    return null;
+  }
+
+  function tryPhonetic(name) {
+    const allKeys = [...new Set([...Object.keys(letterPhones), ...Object.keys(digitPhones)])]
+      .sort((a, b) => b.length - a.length);
+    const tokens = [];
+    let i = 0;
+    while (i < name.length) {
+      let matched = false;
+      for (const k of allKeys) {
+        if (name.substr(i, k.length) === k) {
+          const isLetter = letterPhones[k] !== undefined;
+          const isDigit = digitPhones[k] !== undefined;
+          let type;
+          if (isLetter && !isDigit) type = 'L';
+          else if (isDigit && !isLetter) type = 'D';
+          else type = 'L'; // 모호한 음절(이/오)은 기본 문자 — 숫자는 투/쓰리 등 명확한 음절 사용
+          tokens.push({ type, value: type === 'L' ? letterPhones[k] : digitPhones[k] });
+          i += k.length;
+          matched = true;
+          break;
+        }
+      }
+      if (!matched) return null;
+    }
+    if (tokens.length === 0) return null;
+
+    let formula = '';
+    let j = 0;
+    while (j < tokens.length) {
+      if (tokens[j].type === 'L') {
+        let letters = '';
+        while (j < tokens.length && tokens[j].type === 'L') {
+          letters += tokens[j].value;
+          j++;
+        }
+        const parsed = partitionLetters(letters);
+        if (!parsed) return null;
+        formula += parsed;
+      } else {
+        formula += subscript(tokens[j].value);
+        j++;
+      }
+    }
+    return formula;
+  }
+
+  // 통합 lookup 파이프라인
+  function lookup(word) {
+    if (dict[word]) return { formula: dict[word], method: '사전' };
+    const bin = tryBinary(word);
+    if (bin) return { formula: bin, method: '명명법' };
+    const pref = tryPrefixed(word);
+    if (pref) return { formula: pref, method: '명명법' };
+    const phon = tryPhonetic(word);
+    if (phon) return { formula: phon, method: '발음' };
+    return null;
+  }
+
+  const input = document.getElementById('input');
+  const result = document.getElementById('result');
+
+  function fallbackCopy(text) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+    return ok;
+  }
+
+  async function copyFormula(formula, formulaEl, labelEl) {
+    let ok = false;
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(formula);
+        ok = true;
+      } else {
+        ok = fallbackCopy(formula);
+      }
+    } catch (e) {
+      ok = fallbackCopy(formula);
+    }
+    const originalLabel = labelEl.textContent;
+    if (ok) {
+      formulaEl.classList.add('copied');
+      labelEl.textContent = '복사됨!';
+      labelEl.classList.add('copied');
+    } else {
+      labelEl.textContent = '복사 실패';
+    }
+    setTimeout(() => {
+      formulaEl.classList.remove('copied');
+      labelEl.classList.remove('copied');
+      labelEl.textContent = originalLabel;
+    }, 1200);
+  }
+
+  input.addEventListener('input', () => {
+    const word = input.value.trim();
+    if (!word) {
+      result.innerHTML = '<div class="empty">단어 입력</div>';
+      return;
+    }
+    const hit = lookup(word);
+    if (hit) {
+      const len = hit.formula.length;
+      const fontSize = len > 28 ? 13 : len > 20 ? 16 : len > 14 ? 20 : 26;
+      result.innerHTML = `<div class="formula" title="클릭하여 복사" style="font-size:${fontSize}px">${hit.formula}</div><div class="label">${word} · ${hit.method}</div>`;
+      const formulaEl = result.querySelector('.formula');
+      const labelEl = result.querySelector('.label');
+      formulaEl.addEventListener('click', () => copyFormula(hit.formula, formulaEl, labelEl));
+    } else {
+      result.innerHTML = `<div class="empty">없음</div>`;
+    }
+  });
+</script>
+</body>
+</html>
