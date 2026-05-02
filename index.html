@@ -535,9 +535,14 @@
   };
 
   const subDigits = '₀₁₂₃₄₅₆₇₈₉';
+  const supDigits = '⁰¹²³⁴⁵⁶⁷⁸⁹';
   function subscript(n) {
     if (n === 1) return '';
     return String(n).split('').map(d => subDigits[+d]).join('');
+  }
+  function superscript(n) {
+    if (n === 1) return '';
+    return String(n).split('').map(d => supDigits[+d]).join('');
   }
 
   // 이성분 명명법: [수사][음이온]화 [수사][원소]
@@ -622,20 +627,32 @@
   }
 
   function tryPhonetic(name) {
+    // 이온 전하: 마이너스/플러스 접미사 처리
+    let charge = '';
+    let body = name;
+    if (body.endsWith('마이너스')) {
+      body = body.slice(0, -4);
+      charge = '⁻';
+    } else if (body.endsWith('플러스')) {
+      body = body.slice(0, -3);
+      charge = '⁺';
+    }
+    if (!body) return null;
+
     const allKeys = [...new Set([...Object.keys(letterPhones), ...Object.keys(digitPhones)])]
       .sort((a, b) => b.length - a.length);
     const tokens = [];
     let i = 0;
-    while (i < name.length) {
+    while (i < body.length) {
       let matched = false;
       for (const k of allKeys) {
-        if (name.substr(i, k.length) === k) {
+        if (body.substr(i, k.length) === k) {
           const isLetter = letterPhones[k] !== undefined;
           const isDigit = digitPhones[k] !== undefined;
           let type;
           if (isLetter && !isDigit) type = 'L';
           else if (isDigit && !isLetter) type = 'D';
-          else type = 'L'; // 모호한 음절(이/오)은 기본 문자 — 숫자는 투/쓰리 등 명확한 음절 사용
+          else type = 'L'; // 모호한 음절(이/오)은 기본 문자
           tokens.push({ type, value: type === 'L' ? letterPhones[k] : digitPhones[k] });
           i += k.length;
           matched = true;
@@ -659,25 +676,48 @@
         if (!parsed) return null;
         formula += parsed;
       } else {
-        formula += subscript(tokens[j].value);
+        // 이온 전하가 있고 마지막 토큰인 경우 → 위첨자
+        const isLast = j === tokens.length - 1;
+        if (isLast && charge) {
+          formula += superscript(tokens[j].value);
+        } else {
+          formula += subscript(tokens[j].value);
+        }
         j++;
       }
     }
-    return formula;
+    return formula + charge;
   }
 
   // ASCII 화학식 직접 입력 정규화 (h2o → H₂O, ca(oh)2 → Ca(OH)₂)
   function tryFormula(name) {
-    if (!/^[A-Za-z0-9()]+$/.test(name)) return null;
-    if (!/[A-Za-z]/.test(name)) return null;
+    // 이온 전하: 마지막에 +/- (선택적으로 ^숫자 또는 단일 숫자)
+    let charge = '';
+    let body = name;
+    let m = body.match(/^(.+?)\^(\d*)([+\-])$/);
+    if (m) {
+      body = m[1];
+      const num = parseInt(m[2] || '1', 10);
+      const sign = m[3] === '+' ? '⁺' : '⁻';
+      charge = (num === 1 ? '' : superscript(num)) + sign;
+    } else {
+      m = body.match(/^(.+?)([+\-])$/);
+      if (m) {
+        body = m[1];
+        charge = m[2] === '+' ? '⁺' : '⁻';
+      }
+    }
+
+    if (!/^[A-Za-z0-9()]+$/.test(body)) return null;
+    if (!/[A-Za-z]/.test(body)) return null;
     let result = '';
     let i = 0;
-    while (i < name.length) {
-      const ch = name[i];
+    while (i < body.length) {
+      const ch = body[i];
       if (/[0-9]/.test(ch)) {
         let num = '';
-        while (i < name.length && /[0-9]/.test(name[i])) {
-          num += name[i];
+        while (i < body.length && /[0-9]/.test(body[i])) {
+          num += body[i];
           i++;
         }
         result += num.split('').map(d => subDigits[+d]).join('');
@@ -686,8 +726,8 @@
         i++;
       } else {
         let letters = '';
-        while (i < name.length && /[A-Za-z]/.test(name[i])) {
-          letters += name[i].toUpperCase();
+        while (i < body.length && /[A-Za-z]/.test(body[i])) {
+          letters += body[i].toUpperCase();
           i++;
         }
         const parsed = partitionLetters(letters);
@@ -695,7 +735,7 @@
         result += parsed;
       }
     }
-    return result;
+    return result + charge;
   }
 
   // 통합 lookup 파이프라인
