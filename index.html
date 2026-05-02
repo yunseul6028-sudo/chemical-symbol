@@ -642,6 +642,38 @@
     return formula;
   }
 
+  // ASCII 화학식 직접 입력 정규화 (h2o → H₂O, ca(oh)2 → Ca(OH)₂)
+  function tryFormula(name) {
+    if (!/^[A-Za-z0-9()]+$/.test(name)) return null;
+    if (!/[A-Za-z]/.test(name)) return null;
+    let result = '';
+    let i = 0;
+    while (i < name.length) {
+      const ch = name[i];
+      if (/[0-9]/.test(ch)) {
+        let num = '';
+        while (i < name.length && /[0-9]/.test(name[i])) {
+          num += name[i];
+          i++;
+        }
+        result += num.split('').map(d => subDigits[+d]).join('');
+      } else if (ch === '(' || ch === ')') {
+        result += ch;
+        i++;
+      } else {
+        let letters = '';
+        while (i < name.length && /[A-Za-z]/.test(name[i])) {
+          letters += name[i].toUpperCase();
+          i++;
+        }
+        const parsed = partitionLetters(letters);
+        if (parsed === null) return null;
+        result += parsed;
+      }
+    }
+    return result;
+  }
+
   // 통합 lookup 파이프라인
   function lookup(word) {
     if (dict[word]) return { formula: dict[word], method: '사전' };
@@ -651,6 +683,8 @@
     if (pref) return { formula: pref, method: '명명법' };
     const phon = tryPhonetic(word);
     if (phon) return { formula: phon, method: '발음' };
+    const fmla = tryFormula(word);
+    if (fmla) return { formula: fmla, method: '변환' };
     return null;
   }
 
