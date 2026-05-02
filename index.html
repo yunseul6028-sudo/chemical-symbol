@@ -78,9 +78,28 @@
     color: #bbb;
     text-align: center;
   }
+  #pipBtn {
+    position: fixed;
+    top: 4px;
+    right: 4px;
+    width: 22px;
+    height: 22px;
+    border: none;
+    background: transparent;
+    color: #bbb;
+    cursor: pointer;
+    font-size: 14px;
+    border-radius: 4px;
+    padding: 0;
+    line-height: 1;
+    -webkit-app-region: no-drag;
+    z-index: 10;
+  }
+  #pipBtn:hover { color: #555; background: #f0f0f0; }
 </style>
 </head>
 <body>
+  <button id="pipBtn" title="작은 창으로 분리 (PiP)" aria-label="PiP">⧉</button>
   <input id="input" type="text" placeholder="단어 입력" autocomplete="off" autofocus>
   <div class="result" id="result">
     <div class="empty">단어 입력</div>
@@ -748,6 +767,38 @@
     } else {
       result.innerHTML = `<div class="empty">없음</div>`;
     }
+  });
+
+  // ===== Picture-in-Picture (작은 창) =====
+  const pipBtn = document.getElementById('pipBtn');
+  const pipSupported = 'documentPictureInPicture' in window;
+
+  if (!pipSupported) {
+    pipBtn.title = '작은 창은 Chrome/Edge 116+ 에서만 가능 — Safari는 파일 → 도크에 추가 사용';
+  }
+
+  pipBtn.addEventListener('click', async () => {
+    if (!pipSupported) {
+      alert('이 브라우저는 PiP를 지원하지 않습니다.\n\n• Chrome 116+ 또는 Edge 사용\n• Safari (macOS): 파일 메뉴 → 도크에 추가하면 작은 웹앱 창으로 띄울 수 있어요');
+      return;
+    }
+    const pipWindow = await documentPictureInPicture.requestWindow({
+      width: 240,
+      height: 150
+    });
+    // 스타일 복사
+    document.querySelectorAll('style').forEach(s => {
+      pipWindow.document.head.appendChild(s.cloneNode(true));
+    });
+    // input + result 이동 (DOM 노드 그대로 이동하므로 이벤트 핸들러도 따라감)
+    pipWindow.document.body.appendChild(input);
+    pipWindow.document.body.appendChild(result);
+    input.focus();
+
+    pipWindow.addEventListener('pagehide', () => {
+      document.body.appendChild(input);
+      document.body.appendChild(result);
+    });
   });
 </script>
 </body>
