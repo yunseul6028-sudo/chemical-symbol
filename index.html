@@ -80,26 +80,31 @@
   }
   #pipBtn {
     position: fixed;
-    top: 4px;
-    right: 4px;
-    width: 22px;
-    height: 22px;
-    border: none;
-    background: transparent;
-    color: #bbb;
+    bottom: 8px;
+    right: 8px;
+    height: 26px;
+    padding: 0 10px;
+    border: 1px solid #ccc;
+    background: white;
+    color: #555;
     cursor: pointer;
-    font-size: 14px;
-    border-radius: 4px;
-    padding: 0;
+    font-size: 11px;
+    font-family: inherit;
+    border-radius: 13px;
     line-height: 1;
     -webkit-app-region: no-drag;
     z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
   }
-  #pipBtn:hover { color: #555; background: #f0f0f0; }
+  #pipBtn:hover { color: #111; border-color: #888; background: #f8f8f8; }
+  #pipBtn .pip-icon { font-size: 13px; }
 </style>
 </head>
 <body>
-  <button id="pipBtn" title="작은 창으로 분리 (PiP)" aria-label="PiP">⧉</button>
+  <button id="pipBtn" title="작은 창으로 분리"><span class="pip-icon">⧉</span><span>작은 창</span></button>
   <input id="input" type="text" placeholder="단어 입력" autocomplete="off" autofocus>
   <div class="result" id="result">
     <div class="empty">단어 입력</div>
